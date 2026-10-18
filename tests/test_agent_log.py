@@ -25,8 +25,14 @@ EXPECT = [
     ("claude", "/fx/claude", "44444444-4444-4444-8444-444444444444", 3, 2, ["/fx/claude/CHANGELOG.md"], 1, 1, "done"),
     ("gemini", "/fx/gemini", "55555555-5555-4555-8555-555555555555", 2, 1, ["/fx/gemini/lib.py"], 1, 0, "done"),
     ("opencode", "/fx/opencode", "ses_legacy1", 2, 1, ["/fx/opencode/notes.txt"], 1, 0, "done"),
-    ("opencode", "/fx/opencode-db", "ses_db1", 1, 1, ["a"], 1, 1, "unknown"),
+    ("opencode", "/fx/opencode-db", "ses_db1", 1, 1, ["a"], 1, 1, "failed"),
     ("pi", "/fx/pi", "66666666-6666-4666-8666-666666666666", 3, 2, ["/fx/pi/config.json"], 1, 1, "done"),
+    # real sessions recorded on the box through the magpie gateway (paths sanitized to /fx/*-real)
+    ("claude", "/fx/claude-real", "134298f6-a5a5-45ef-ad9e-e4b2524e1076", 6, 1, ["/fx/claude-real/calc.py"], 1, 0, "done"),
+    ("claude", "/fx/claude-real", "7ede2b2f-bb02-44bf-b388-1f38d9a9f06b", 7, 1, [], 6, 0, "failed"),
+    ("gemini", "/fx/gemini-real", "d9840123-71e8-4ec2-bc0e-d95e08e96de0", 4, 1, ["/fx/gemini-real/calc.py"], 1, 0, "done"),
+    ("opencode", "/fx/opencode-real", "ses_eb24f4645ffe0DUv709DVDipk1", 5, 1, ["/fx/opencode-real/calc.py"], 1, 0, "done"),
+    ("opencode", "/fx/opencode-real", "ses_eb2512259ffeq4dCOrlSF5d0FF", 0, 1, [], 1, 0, "failed"),
 ]
 
 class AgentLogTest(unittest.TestCase):
@@ -39,6 +45,9 @@ class AgentLogTest(unittest.TestCase):
         os.makedirs(cls.proc)
         db = sqlite3.connect(os.path.join(cls.home, ".local/share/opencode/opencode.db"))
         with open(os.path.join(FIX, "opencode_db.sql")) as f: db.executescript(f.read())
+        db.commit(); db.close()
+        db = sqlite3.connect(os.path.join(cls.home, ".local/share/opencode/opencode-v1.db"))  # real OpenCode 1.19 schema
+        with open(os.path.join(FIX, "opencode_v1_db.sql")) as f: db.executescript(f.read())
         db.commit(); db.close()
         old = time.time() - 7 * 86400  # well outside the "recently written" window
         for i, (dp, ds, fs) in enumerate(os.walk(cls.home)):
@@ -104,7 +113,7 @@ class AgentLogTest(unittest.TestCase):
 
     def test_opencode_skips_child_sessions(self):
         ids = {s.id for s in al.PROVIDERS["opencode"].sessions()}
-        self.assertEqual(ids, {"ses_legacy1", "ses_db1"})
+        self.assertEqual(ids, {"ses_legacy1", "ses_db1", "ses_eb24f4645ffe0DUv709DVDipk1", "ses_eb2512259ffeq4dCOrlSF5d0FF"})
 
     # ---- list ----
     def test_list_text(self):
@@ -112,7 +121,7 @@ class AgentLogTest(unittest.TestCase):
         self.assertTrue(out.startswith("last(+08)"))
         rows = [l.split() for l in out.splitlines()[1:]]
         for prov, cwd, sid, *_ in EXPECT:
-            self.assertIn([prov, sid[:8], cwd], [[r[2], r[3], r[-1]] for r in rows if len(r) > 4])
+            self.assertIn([prov, al.short_id(sid), cwd], [[r[2], r[3], r[-1]] for r in rows if len(r) > 4])
 
     def test_list_json(self):
         d = self.cli_json("list", "-n", "50")
@@ -120,7 +129,7 @@ class AgentLogTest(unittest.TestCase):
         self.assertEqual(len(d["sessions"]), len(EXPECT))
         for item in d["sessions"]:
             self.assertTrue(LIST_KEYS <= set(item), LIST_KEYS - set(item))
-            self.assertIn(item["status"], ("running", "done", "unknown"))
+            self.assertIn(item["status"], ("running", "done", "failed", "unknown"))
             self.assertRegex(item["updated"], ISO_RE); self.assertRegex(item["started"], ISO_RE)
         got = {(i["source"], i["session_id"]): i for i in d["sessions"]}
         for prov, cwd, sid, steps, turns, files, _, _, status in EXPECT:
@@ -213,6 +222,10 @@ class AgentLogTest(unittest.TestCase):
             fake(102, ["codex", "resume", "22222222"], "/elsewhere")
             fake(103, ["/usr/local/bin/gemini"], "/not/a/project")
             os.utime(pi_path)
+            # recently written but no pi process alive anywhere: a finished run, not a running one
+            got = {i["source"] + ":" + i["session_id"][:8]: i for i in self.cli_json("list", "-n", "50")["sessions"]}
+            self.assertEqual(got["pi:66666666"]["status"], "done")
+            fake(104, ["node", "/usr/lib/node_modules/@mariozechner/pi-coding-agent/dist/cli.js"], "/some/other/dir")
             got = {i["source"] + ":" + i["session_id"][:8]: i for i in self.cli_json("list", "-n", "50")["sessions"]}
             self.assertEqual((got["claude:44444444"]["status"], got["claude:44444444"]["status_reason"]), ("running", "proc:cwd"))
             self.assertEqual((got["codex:22222222"]["status"], got["codex:22222222"]["status_reason"]), ("running", "proc:session-id"))
@@ -225,6 +238,37 @@ class AgentLogTest(unittest.TestCase):
         finally:
             shutil.rmtree(self.proc); os.makedirs(self.proc)
             os.utime(pi_path, (st.st_atime, st.st_mtime))
+
+    # ---- real-session regressions ----
+    def test_gemini_jsonl_upserts(self):
+        ev = al.load(self.session("gemini", "d9840123-71e8-4ec2-bc0e-d95e08e96de0"))
+        calls = [e for e in ev if e["k"] == "tool_call"]
+        self.assertEqual(len(calls), 5)  # each record is written twice (before/after toolCalls); count once
+        users = [e for e in ev if e["k"] == "user"]
+        self.assertEqual(len(users), 1)  # <session_context> and functionResponse records are not prompts
+        self.assertTrue(users[0]["text"].startswith("Read notes.txt"))
+        err = [e for e in ev if e["k"] == "error"]
+        self.assertEqual(err[0]["tool"], "run_shell_command")  # status "success" but "Exit Code: 1"
+        self.assertNotIn("untrusted_context", err[0]["text"]); self.assertNotIn("PGID", err[0]["text"])
+
+    def test_opencode_v1_db(self):
+        s = self.session("opencode", "ses_eb24f4645ffe0DUv709DVDipk1")
+        self.assertTrue(s.path.endswith("opencode-v1.db#ses_eb24f4645ffe0DUv709DVDipk1"))
+        ev = al.load(s)
+        ts = [e["t"] for e in ev if e["k"] in ("user", "say", "tool_call")]
+        self.assertEqual(ts, sorted(ts))  # tool calls use their own start time, not the message's
+        self.assertEqual([e["text"] for e in ev if e["k"] == "tool_call"][-1], "bash $ cat missing_file.txt")
+        self.assertEqual(al.short_id(s.id), "ses_eb24f4645f")
+        out = self.cli("summary", "ses_eb2512259f")
+        self.assertIn("Factory: Forbidden", out)
+
+    def test_failed_edit_not_counted(self):
+        ev = al.load(self.session("claude", "7ede2b2f-bb02-44bf-b388-1f38d9a9f06b"))
+        self.assertTrue(any(e["k"] == "tool_call" and e["tool"] == "Edit" for e in ev))
+        self.assertEqual(al.files_changed(ev), [])
+        item = self.cli_json("summary", "7ede2b2f")
+        self.assertEqual((item["status"], item["status_reason"]), ("failed", "ended on agent/API error"))
+        self.assertIsNone(item["final_answer"])
 
     def test_proc_kind(self):
         self.assertEqual(al.proc_kind(["droid", "exec"]), "droid")

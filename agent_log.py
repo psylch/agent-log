@@ -5,7 +5,7 @@ Sources (resolved from $HOME at call time; AGENT_LOG_HOME_<NAME> replaces a prov
   droid     ~/.factory/sessions/<escaped-cwd>/<id>.jsonl
   codex     ~/.codex/{sessions,archived_sessions}/**/*.jsonl[.zst]   ($CODEX_HOME)
   claude    ~/.claude/projects/<escaped-cwd>/<id>.jsonl              ($CLAUDE_CONFIG_DIR)
-  gemini    ~/.gemini/tmp/<hash>/chats/session-*.json
+  gemini    ~/.gemini/tmp/<project>/chats/session-*.json[l]
   opencode  ~/.local/share/opencode/{opencode*.db,storage/}          ($XDG_DATA_HOME)
   pi        ~/.pi/agent/sessions/--<cwd>--/<ts>_<id>.jsonl           ($PI_CODING_AGENT_DIR)
 Times shown in Asia/Taipei (UTC+8).
@@ -62,6 +62,11 @@ def parse_when(s):
 def short(s, n):
     s = re.sub(r"\s+", " ", str(s or "")).strip()
     return s if len(s) <= n else s[: n - 1] + "…"
+
+def short_id(sid):
+    """Prefix to show and type back. OpenCode ids (ses_<time-sortable>) share their first 8 chars, so keep more."""
+    sid = str(sid)
+    return sid[:14] if sid.startswith("ses_") else sid[:8]
 
 def clip(s, n):
     s = str(s or "")
@@ -158,11 +163,11 @@ def edit_paths(name, inp):
         if isinstance(inp.get(k), str): return PATCH_RE.findall(inp[k])
     return []
 
-def tool_ev(t, name, inp, mid=None):
+def tool_ev(t, name, inp, mid=None, cid=None):
     if isinstance(inp, str):
         try: inp = json.loads(inp)
         except Exception: pass
-    return E(t, "tool_call", tool_oneliner(name, inp), tool=name, paths=edit_paths(name, inp), mid=mid)
+    return E(t, "tool_call", tool_oneliner(name, inp), tool=name, paths=edit_paths(name, inp), mid=mid, cid=cid)
 
 def result_text(c):
     if isinstance(c, list):
@@ -232,14 +237,14 @@ class Droid(Provider):
                 if role == "user" and xt == "text":
                     if not is_injected(x.get("text", "")): ev.append(E(t, "user", x.get("text", "")))
                 elif role == "user" and xt == "tool_result":
-                    ev.append(E(t, "tool_result", result_text(x.get("content")), tool=names.get(x.get("tool_use_id"), "?"), err=bool(x.get("is_error"))))
+                    ev.append(E(t, "tool_result", result_text(x.get("content")), tool=names.get(x.get("tool_use_id"), "?"), err=bool(x.get("is_error")), cid=x.get("tool_use_id")))
                 elif role == "assistant" and xt == "text":
                     ev.append(E(t, "say", x.get("text", "")))
                 elif role == "assistant" and xt == "thinking":
                     ev.append(E(t, "think", x.get("thinking", "")))
                 elif role == "assistant" and xt == "tool_use":
                     names[x.get("id")] = x.get("name")
-                    ev.append(tool_ev(t, x.get("name"), x.get("input") or {}))
+                    ev.append(tool_ev(t, x.get("name"), x.get("input") or {}, cid=x.get("id")))
         return ev
 
 class Codex(Provider):
@@ -346,7 +351,7 @@ class Claude(Provider):
                         if txt is None: continue
                         ev.append(E(t, "error" if txt.startswith("[Request interrupted") else "user", txt))
                     elif x.get("type") == "tool_result":
-                        ev.append(E(t, "tool_result", result_text(x.get("content")), tool=names.get(x.get("tool_use_id"), "?"), err=bool(x.get("is_error"))))
+                        ev.append(E(t, "tool_result", result_text(x.get("content")), tool=names.get(x.get("tool_use_id"), "?"), err=bool(x.get("is_error")), cid=x.get("tool_use_id")))
                 continue
             if d.get("isApiErrorMessage"):
                 ev.append(E(t, "error", blocks_text(content))); continue
@@ -357,21 +362,43 @@ class Claude(Provider):
                 elif xt == "thinking" and x.get("thinking"): ev.append(E(t, "think", x["thinking"], mid=mid))
                 elif xt == "tool_use":
                     names[x.get("id")] = x.get("name")
-                    ev.append(tool_ev(t, x.get("name"), x.get("input") or {}, mid=mid))
+                    ev.append(tool_ev(t, x.get("name"), x.get("input") or {}, mid=mid, cid=x.get("id")))
         return ev
 
 class Gemini(Provider):
+    """chats/session-*.json (one JSON document) or, Gemini CLI >= ~0.60, chats/session-*.jsonl:
+    a metadata header line, then message records upserted by id (last write wins) and {"$set": ...} patches."""
     name, procs = "gemini", ("gemini",)
     def root(self): return os.path.join(base_dir("gemini", None, ".gemini"), "tmp")
-    def discover(self): return glob.glob(os.path.join(self.root(), "*", "chats", "session-*.json"))
+    def discover(self):
+        return [p for ext in ("json", "jsonl") for p in glob.glob(os.path.join(self.root(), "*", "chats", f"session-*.{ext}"))]
+    @staticmethod
+    def doc(path):
+        """(meta, messages) for either layout."""
+        if not path.endswith(".jsonl"):
+            d = read_json(path)
+            if not isinstance(d, dict) or not isinstance(d.get("messages"), list): raise ValueError("not a gemini chat")
+            return d, d["messages"]
+        meta, order, by_id = {}, [], {}
+        for d in iter_jsonl(read_lines(path)):
+            if "$set" in d:
+                if isinstance(d["$set"], dict): meta.update(d["$set"])
+                continue
+            if "type" not in d and ("sessionId" in d or "projectHash" in d):
+                meta.update(d); continue
+            mid = d.get("id") or f"_{len(order)}"
+            if mid not in by_id: order.append(mid)
+            by_id[mid] = d
+        if not meta and not order: raise ValueError("not a gemini chat")
+        return meta, [by_id[i] for i in order]
     def peek(self, path):
-        d = read_json(path)
-        if not isinstance(d, dict) or not isinstance(d.get("messages"), list): raise ValueError("not a gemini chat")
+        meta, _ = self.doc(path)
         cwd = None
         try:
             with open(os.path.join(os.path.dirname(os.path.dirname(path)), ".project_root")) as f: cwd = f.read().strip() or None
         except Exception: pass
-        sid = d.get("sessionId") or os.path.basename(path)[8:-5]
+        base = os.path.basename(path)
+        sid = meta.get("sessionId") or re.sub(r"^session-|\.jsonl?$", "", base)
         return Sess(self, path, sid, cwd, os.path.getmtime(path))
     @staticmethod
     def response(r):
@@ -381,15 +408,23 @@ class Gemini(Provider):
         for k in ("output", "error"):
             if isinstance(resp.get(k), str) and resp[k]: return resp[k]
         return json.dumps(resp, ensure_ascii=False)
+    EXIT_RE = re.compile(r"^Exit Code: ([1-9]\d*)", re.M)
+    @staticmethod
+    def clean(out):
+        # run_shell_command output is wrapped as <untrusted_context>Output: ...</untrusted_context> in newer CLIs
+        out = re.sub(r"^\s*<untrusted_context>\s*|\s*</untrusted_context>\s*$", "", out)
+        out = re.sub(r"\n?Process Group PGID: \d+\s*$", "", out)
+        return re.sub(r"^Output: ", "", out)
     def events(self, path):
         ev = []
-        for m in (read_json(path) or {}).get("messages") or []:
+        for m in self.doc(path)[1]:
             if not isinstance(m, dict): continue
             t = parse_ts(m.get("timestamp")); ty = m.get("type"); mid = m.get("id")
             c = m.get("content")
             txt = c if isinstance(c, str) else "\n".join(x.get("text", "") for x in c or [] if isinstance(x, dict) and x.get("text"))
             if ty == "user":
-                if txt.strip(): ev.append(E(t, "user", txt))
+                # functionResponse-only records are tool results (already taken from toolCalls); <session_context> is injected
+                if txt.strip() and not txt.lstrip().startswith("<session_context>"): ev.append(E(t, "user", txt))
             elif ty == "gemini":
                 for th in m.get("thoughts") or []:
                     if isinstance(th, dict): ev.append(E(t, "think", ": ".join(x for x in (th.get("subject"), th.get("description")) if x), mid=mid))
@@ -397,13 +432,16 @@ class Gemini(Provider):
                 results = []
                 for tc in m.get("toolCalls") or []:
                     if not isinstance(tc, dict): continue
-                    name = tc.get("name"); ev.append(tool_ev(t, name, tc.get("args") or {}, mid=mid))
+                    name = tc.get("name"); cid = tc.get("id") or f"{mid}:{len(results)}"
+                    ev.append(tool_ev(t, name, tc.get("args") or {}, mid=mid, cid=cid))
                     rt = parse_ts(tc.get("timestamp")) or t
-                    out = "\n".join(self.response(r) for r in tc.get("result") or [])
-                    if tc.get("status") in ("error", "cancelled"): results.append(E(rt, "error", out or tc.get("status"), tool=name))
-                    else: results.append(E(rt, "tool_result", out, tool=name))
+                    out = self.clean("\n".join(self.response(r) for r in tc.get("result") or []))
+                    if tc.get("status") in ("error", "cancelled"): results.append(E(rt, "error", out or tc.get("status"), tool=name, cid=cid))
+                    else: results.append(E(rt, "tool_result", out, tool=name, err=bool(self.EXIT_RE.search(out)), cid=cid))
                 ev.extend(results)
             elif ty == "error":
+                ev.append(E(t, "error", txt))
+            elif ty == "info" and txt.strip().lower().startswith(("request cancelled", "operation cancelled")):
                 ev.append(E(t, "error", txt))
         return ev
 
@@ -415,20 +453,30 @@ class OpenCode(Provider):
         if xdg and not os.environ.get("AGENT_LOG_HOME_OPENCODE"): return os.path.join(xdg, "opencode")
         return base_dir("opencode", None, ".local", "share", "opencode")
     def connect(self, db):
+        """(conn, schema): "v1" = session/message/part tables (OpenCode 1.x), "v2" = session_v2/session_message."""
         for q in ("mode=ro", "immutable=1"):
             try:
                 c = sqlite3.connect(f"file:{urllib.parse.quote(db)}?{q}", uri=True, timeout=2)
-                c.execute("SELECT 1 FROM session_v2 LIMIT 1").fetchall()
-                return c
+                tabs = {r[0] for r in c.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+                if "session_v2" in tabs and "session_message" in tabs:
+                    # some builds carry both; prefer whichever actually holds messages
+                    if not ({"session", "message", "part"} <= tabs) or c.execute("SELECT 1 FROM session_message LIMIT 1").fetchone():
+                        return c, "v2"
+                if {"session", "message", "part"} <= tabs: return c, "v1"
+                c.close()
             except sqlite3.Error: continue
-        return None
-    SESS_SQL = ("SELECT s.id, s.directory, s.time_updated, "
-                "(SELECT IFNULL(max(m.time_updated), 0) FROM session_message m WHERE m.session_id = s.id) FROM session_v2 s ")
+        return None, None
+    SESS_SQL = {
+        "v2": ("SELECT s.id, s.directory, s.time_updated, "
+               "(SELECT IFNULL(max(m.time_updated), 0) FROM session_message m WHERE m.session_id = s.id) FROM session_v2 s "),
+        "v1": ("SELECT s.id, s.directory, s.time_updated, "
+               "(SELECT IFNULL(max(p.time_updated), 0) FROM part p WHERE p.session_id = s.id) FROM session s "),
+    }
     def db_sessions(self, db, sid=None):
-        c = self.connect(db)
+        c, schema = self.connect(db)
         if not c: return []
         try:
-            rows = c.execute(self.SESS_SQL + ("WHERE s.id = ?" if sid else "WHERE s.parent_id IS NULL"), (sid,) if sid else ()).fetchall()
+            rows = c.execute(self.SESS_SQL[schema] + ("WHERE s.id = ?" if sid else "WHERE s.parent_id IS NULL"), (sid,) if sid else ()).fetchall()
         except sqlite3.Error: rows = []
         finally: c.close()
         return [Sess(self, f"{db}#{r[0]}", r[0], r[1], ms(max(r[2] or 0, r[3] or 0)) or os.path.getmtime(db)) for r in rows]
@@ -454,23 +502,30 @@ class OpenCode(Provider):
         return Sess(self, path, d["id"], d.get("directory"), mt)
     def fingerprint(self, path): return self.peek(path).mtime
     @staticmethod
-    def tool_parts(t, name, st, rt, mid):
+    def tool_parts(t, name, st, rt, mid, cid=None):
         st = st if isinstance(st, dict) else {}
-        call = tool_ev(t, name, st.get("input"), mid=mid)
+        t = ms((st.get("time") or {}).get("start")) or t
+        call = tool_ev(t, name, st.get("input"), mid=mid, cid=cid)
         meta = st.get("metadata") if isinstance(st.get("metadata"), dict) else {}
         if st.get("status") == "error":
             e = st.get("error"); msg = e.get("message") if isinstance(e, dict) else e
-            return call, E(rt, "error", msg or "error", tool=name)
+            return call, E(rt, "error", msg or "error", tool=name, cid=cid)
         if st.get("status") == "completed":
             out = st["output"] if "output" in st else result_text(st.get("content"))
             ex = meta.get("exit")
-            return call, E(rt, "tool_result", result_text(out), tool=name, err=(isinstance(ex, int) and ex != 0) or meta.get("error") is True)
+            return call, E(rt, "tool_result", result_text(out), tool=name, err=(isinstance(ex, int) and ex != 0) or meta.get("error") is True, cid=cid)
         return call, None
     def events(self, path):
         return self.db_events(path) if ".db#" in path else self.legacy_events(path)
     def db_events(self, path):
-        db, _, sid = path.rpartition("#"); c = self.connect(db)
+        db, _, sid = path.rpartition("#"); c, schema = self.connect(db)
         if not c: return []
+        if schema == "v1":
+            try:
+                msgs = c.execute("SELECT id, data, time_created FROM message WHERE session_id = ? ORDER BY time_created, id", (sid,)).fetchall()
+                parts = c.execute("SELECT message_id, id, data FROM part WHERE session_id = ? ORDER BY id", (sid,)).fetchall()
+            finally: c.close()
+            return self.v1_events(msgs, parts)
         try: rows = c.execute("SELECT id, type, data, time_created FROM session_message WHERE session_id = ? ORDER BY seq", (sid,)).fetchall()
         finally: c.close()
         ev = []
@@ -492,7 +547,7 @@ class OpenCode(Provider):
                     elif pt == "reasoning" and str(part.get("text") or "").strip(): ev.append(E(t, "think", part["text"], mid=mid))
                     elif pt == "tool":
                         rt = ms((part.get("time") or {}).get("completed")) or t
-                        call, res = self.tool_parts(t, part.get("name"), part.get("state"), rt, mid)
+                        call, res = self.tool_parts(t, part.get("name"), part.get("state"), rt, mid, part.get("callID") or part.get("id"))
                         ev.append(call)
                         if res: results.append(res)
                 ev.extend(results)
@@ -502,14 +557,36 @@ class OpenCode(Provider):
                 if d.get("status") == "completed": ev.append(E(t, "compact", d.get("summary") or ""))
                 elif d.get("status") == "failed": ev.append(E(t, "error", f"compaction failed: {d.get('error') or ''}"))
         return ev
+    @staticmethod
+    def jl(x):
+        try: d = json.loads(x) if isinstance(x, str) else None
+        except Exception: return None
+        return d if isinstance(d, dict) else None
+    def v1_events(self, msg_rows, part_rows):
+        """OpenCode 1.x DB: message/part rows whose data JSON has the same shape as the old storage/ files
+        (ids live in the columns, not in data)."""
+        msgs = []
+        for mid, data, tc in msg_rows:
+            d = self.jl(data)
+            if d is None: continue
+            d.setdefault("id", mid); d.setdefault("time", {}).setdefault("created", tc); msgs.append(d)
+        parts = {}
+        for mid, pid, data in part_rows:
+            d = self.jl(data)
+            if d is None: continue
+            d.setdefault("id", pid); parts.setdefault(mid, []).append(d)
+        return self.msg_events(msgs, parts)
     def legacy_events(self, path):
-        info = read_json(path) or {}; st = self.legacy_dir(); ev = []
+        info = read_json(path) or {}; st = self.legacy_dir()
         msgs = [m for m in (read_json(p) for p in glob.glob(os.path.join(st, "message", info.get("id", ""), "*.json"))) if isinstance(m, dict)]
+        parts = {m.get("id"): [p for p in (read_json(x) for x in glob.glob(os.path.join(st, "part", m.get("id") or "", "*.json"))) if isinstance(p, dict)] for m in msgs}
+        return self.msg_events(msgs, parts)
+    def msg_events(self, msgs, parts_by_msg):
+        ev = []
         msgs.sort(key=lambda m: ((m.get("time") or {}).get("created") or 0, m.get("id", "")))
         for m in msgs:
             t = ms((m.get("time") or {}).get("created")); mid = m.get("id")
-            parts = [p for p in (read_json(x) for x in glob.glob(os.path.join(st, "part", mid or "", "*.json"))) if isinstance(p, dict)]
-            parts.sort(key=lambda p: p.get("id", ""))
+            parts = sorted(parts_by_msg.get(mid) or [], key=lambda p: p.get("id", ""))
             texts = [p.get("text", "") for p in parts if p.get("type") == "text" and not p.get("synthetic")]
             if m.get("role") == "user":
                 txt = "\n".join(texts)
@@ -521,12 +598,13 @@ class OpenCode(Provider):
             results = []
             for p in parts:
                 pt = p.get("type")
-                if pt == "text" and str(p.get("text") or "").strip(): ev.append(E(t, "say", p["text"], mid=mid))
-                elif pt == "reasoning" and str(p.get("text") or "").strip(): ev.append(E(t, "think", p["text"], mid=mid))
+                pts = ms((p.get("time") or {}).get("start")) or t
+                if pt == "text" and str(p.get("text") or "").strip(): ev.append(E(pts, "say", p["text"], mid=mid))
+                elif pt == "reasoning" and str(p.get("text") or "").strip(): ev.append(E(pts, "think", p["text"], mid=mid))
                 elif pt == "tool":
                     s = p.get("state") if isinstance(p.get("state"), dict) else {}
                     rt = ms((s.get("time") or {}).get("end")) or t
-                    call, res = self.tool_parts(t, p.get("tool"), s, rt, mid)
+                    call, res = self.tool_parts(t, p.get("tool"), s, rt, mid, p.get("callID") or p.get("id"))
                     ev.append(call)
                     if res: results.append(res)
             ev.extend(results)
@@ -609,6 +687,7 @@ def sniff(path):
         if marker in path: return PROVIDERS[name]
     if path.endswith(".json"):
         return PROVIDERS["gemini" if "messages" in (read_json(path) or {}) else "opencode"]
+    if os.path.basename(path).startswith("session-") and path.endswith(".jsonl"): return PROVIDERS["gemini"]
     d = first_json(path); ty = d.get("type")
     if ty == "session_start": return PROVIDERS["droid"]
     if ty == "session_meta" or "payload" in d: return PROVIDERS["codex"]
@@ -666,7 +745,10 @@ def live_procs():
 
 def mark_running(sessions):
     claimed = set()
-    for kind, cwd, sid, _ in live_procs():
+    procs = live_procs()
+    alive_kinds = {k for k, _, _, _ in procs}
+    proc_ok = os.path.isdir(os.environ.get("AGENT_LOG_PROC", "/proc"))
+    for kind, cwd, sid, _ in procs:
         mine = [s for s in sessions if s.kind == kind]
         cands = [s for s in mine if sid and s.id.startswith(sid)]
         why = "proc:session-id"
@@ -680,7 +762,9 @@ def mark_running(sessions):
             s.running, s.why = True, why
     now = time.time()
     for s in sessions:
-        if not s.running and now - s.mtime < RECENT_S:
+        # recent writes only count while some process of that agent is alive: a finished `claude -p`
+        # would otherwise read as running for two minutes after it exited
+        if not s.running and now - s.mtime < RECENT_S and (not proc_ok or s.kind in alive_kinds):
             s.running, s.why = True, f"mtime<{RECENT_S}s"
 
 def resolve(ref, sessions):
@@ -703,8 +787,12 @@ def load(s):
     try: ev = s.prov.events(s.path)
     except Exception as x: ev = [E(None, "error", f"agent-log: failed to parse {s.path}: {x}")]
     turn = 0; last_t = None
+    calls = {e["cid"]: e for e in ev if e["k"] == "tool_call" and e.get("cid")}
     for e in ev:
         if e["k"] == "tool_result" and e.get("err"): e["k"] = "error"
+        # an edit whose own result is an error did not change the file
+        if e["k"] == "error" and e.get("cid") in calls and calls[e["cid"]].get("paths"):
+            calls[e["cid"]]["paths"] = []
         if e["t"] is None: e["t"] = last_t
         last_t = e["t"]
         if e["k"] == "user": turn += 1
@@ -749,6 +837,7 @@ def status_of(s, ev):
     lu = max((i for i, e in enumerate(tail) if e["k"] == "user"), default=-1)
     if any(e["k"] == "final" for e in tail[lu + 1:]): return "done", "final"
     if tail[-1]["k"] == "say": return "done", "ended on assistant text"
+    if tail[-1]["k"] == "error" and not tail[-1].get("tool"): return "failed", "ended on agent/API error"
     return "unknown", f"idle, ended on {tail[-1]['k']}"
 
 def session_item(s, ev, full=True):
@@ -814,7 +903,7 @@ def window(ev, a):
 def header(s, ev):
     steps, turns, t0, t1 = stats(ev)
     run = f"RUNNING ({s.why})" if s.running else "idle"
-    return (f"[{s.kind}] {s.cwd}  {s.id[:8]}  {run}\n"
+    return (f"[{s.kind}] {s.cwd}  {short_id(s.id)}  {run}\n"
             f"  steps {steps}, turns {turns}, {fmt_t(t0, True)} → {fmt_t(t1, True)} (+08), elapsed {fmt_dur((t1 or 0) - (t0 or 0))}")
 
 # ---------------- commands ----------------
@@ -837,7 +926,7 @@ def cmd_list(a):
     for s in ss:
         steps, turns, _, _ = stats(load(s))
         st = f"RUN {s.why}" if s.running else "-"
-        print(f"{fmt_t(s.mtime, True):<11} {s.kind:<8} {s.id[:8]:<8} {steps:>5} {turns:>5}  {st:<20} {s.cwd}")
+        print(f"{fmt_t(s.mtime, True):<11} {s.kind:<8} {short_id(s.id):<8} {steps:>5} {turns:>5}  {st:<20} {s.cwd}")
     print(dim(f"status: proc:cwd/proc:session-id = live agent process matched (newest session in that cwd); mtime<{RECENT_S}s = file just written"))
 
 def get_session(a):

@@ -1,18 +1,19 @@
-import contextlib, importlib.util, io, json, os, re, shutil, sqlite3, subprocess, sys, tempfile, time, unittest
+import json, os, re, shutil, sqlite3, subprocess, sys, tempfile, time, unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SCRIPT = os.path.join(ROOT, "agent_log.py")
 FIX = os.path.join(ROOT, "tests", "fixtures")
 
-_spec = importlib.util.spec_from_file_location("agent_log", SCRIPT)
-al = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(al)
+sys.path.insert(0, ROOT)
+import agent_log as al  # noqa: E402  (the module must stay importable by name for the console script)
 al.USE_COLOR = False
+al.set_tz("+08:00")
 
 NATIVE_ENV = ("CODEX_HOME", "CLAUDE_CONFIG_DIR", "XDG_DATA_HOME", "PI_CODING_AGENT_DIR", "PI_CODING_AGENT_SESSION_DIR")
 SUMMARY_KEYS = {"schema_version", "source", "session_id", "path", "cwd", "status", "status_reason", "started", "updated",
-                "steps", "turns", "task", "files_changed", "errors", "last_actions", "final_answer"}
-LIST_KEYS = SUMMARY_KEYS - {"errors", "last_actions", "final_answer"}
+                "steps", "turns", "task", "files_changed", "error_count", "errors", "last_actions", "final_answer"}
+LIST_KEYS = SUMMARY_KEYS - {"error_count", "errors", "last_actions", "final_answer"}
+EVENT_KEYS = {"ts", "kind", "tool", "text", "paths", "step", "turn"}
 ISO_RE = re.compile(r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d[+-]\d\d:\d\d$")
 CODEX_ZST_JSONL = (json.dumps({"timestamp": "2026-10-02T03:00:00Z", "type": "session_meta", "payload": {"cwd": "/fx/codex-zst"}}) + "\n" +
                    json.dumps({"timestamp": "2026-10-02T03:00:01Z", "type": "response_item", "payload": {"type": "message", "role": "user",
@@ -55,7 +56,8 @@ class AgentLogTest(unittest.TestCase):
         cls.saved_env = dict(os.environ)
         for k in list(os.environ):
             if k in NATIVE_ENV or k.startswith("AGENT_LOG_"): del os.environ[k]
-        os.environ.update(HOME=cls.home, AGENT_LOG_PROC=cls.proc, NO_COLOR="1")
+        os.environ.update(HOME=cls.home, AGENT_LOG_PROC=cls.proc, NO_COLOR="1", AGENT_LOG_TZ="+08:00",
+                          XDG_CACHE_HOME=os.path.join(cls.tmp, "cache"))
         cls.env = dict(os.environ)
 
     @classmethod
@@ -128,7 +130,7 @@ class AgentLogTest(unittest.TestCase):
         self.assertEqual(d["schema_version"], 1)
         self.assertEqual(len(d["sessions"]), len(EXPECT))
         for item in d["sessions"]:
-            self.assertTrue(LIST_KEYS <= set(item), LIST_KEYS - set(item))
+            self.assertEqual(set(item), LIST_KEYS)
             self.assertIn(item["status"], ("running", "done", "failed", "unknown"))
             self.assertRegex(item["updated"], ISO_RE); self.assertRegex(item["started"], ISO_RE)
         got = {(i["source"], i["session_id"]): i for i in d["sessions"]}
@@ -167,10 +169,11 @@ class AgentLogTest(unittest.TestCase):
         for prov, cwd, sid, *_ in EXPECT:
             with self.subTest(prov=prov, sid=sid):
                 d = self.cli_json("summary", sid[:12])
-                self.assertTrue(SUMMARY_KEYS <= set(d), SUMMARY_KEYS - set(d))
+                self.assertEqual(set(d), SUMMARY_KEYS)
+                self.assertEqual(d["error_count"], next(e[6] for e in EXPECT if e[2] == sid))
                 self.assertEqual((d["source"], d["session_id"], d["cwd"]), (prov, sid, cwd))
                 self.assertIsInstance(d["task"], str)
-                for e in d["errors"]: self.assertEqual(set(e) >= {"ts", "text"}, True)
+                for e in d["errors"]: self.assertEqual(set(e), {"ts", "tool", "text"})
                 for e in d["last_actions"]: self.assertIn(e["kind"], ("tool_call", "say")); self.assertRegex(e["ts"], ISO_RE)
         self.assertEqual(self.cli_json("summary", "22222222")["final_answer"], "Fixed the typo in README.md.")
         self.assertIsNone(self.cli_json("summary", "ses_db1")["final_answer"])
@@ -193,12 +196,13 @@ class AgentLogTest(unittest.TestCase):
             with self.subTest(prov=prov, sid=sid):
                 d = self.cli_json("show", sid[:12])
                 self.assertEqual(d["schema_version"], 1)
-                self.assertTrue(LIST_KEYS <= set(d["session"]))
+                self.assertEqual(set(d["session"]), LIST_KEYS)
                 self.assertTrue(d["events"])
                 for e in d["events"]:
-                    self.assertTrue({"ts", "kind", "text"} <= set(e))
+                    self.assertEqual(set(e), EVENT_KEYS)
                     self.assertIn(e["kind"], al.KINDS)
-                    if e["kind"] == "tool_call": self.assertIn("tool", e)
+                    self.assertIsInstance(e["paths"], list)
+                    if e["kind"] == "tool_call": self.assertIsInstance(e["tool"], str)
         d = self.cli_json("tail", "66666666", "--last", "1")
         self.assertEqual([e["kind"] for e in d["events"]], ["say"])
 

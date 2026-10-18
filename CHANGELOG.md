@@ -7,6 +7,14 @@ The JSON output has its own `schema_version`, which only changes on breaking cha
 
 ## [Unreleased]
 
+### Added
+
+- README rewrite with a demo, install options, a JSON schema reference, orchestrator recipes, a comparison
+  with related tools and an FAQ; a Simplified Chinese README (`README.zh-CN.md`).
+- `examples/`: `demo_home.py` (try agent-log on bundled sample sessions), `wait-for-agent.sh`,
+  `notify-on-done.sh` and an agent skill (`skill/SKILL.md`).
+- `docs/assets/`: banner, social preview and a terminal demo generated from real output (`make_demo_svg.py`).
+
 ## [0.1.0] - 2026-10-18
 
 First public release.

@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="940" height="800" viewBox="0 0 940 800" role="img" aria-label="agent-log listing sessions of six coding agents, then a one-screen summary of a Claude Code session">
+<style>
+  .win { fill: #161b22; stroke: #30363d; } .bar { fill: #21262d; }
+  text { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, 'DejaVu Sans Mono', 'Liberation Mono', monospace;
+         font-size: 14px; fill: #c9d1d9; white-space: pre; }
+  .t { fill: #8b949e; font-size: 13px; } .p { fill: #3fb950; font-weight: bold; } .c { fill: #f0f6fc; font-weight: bold; }
+  .d { fill: #8b949e; } .r { fill: #f85149; } .ok { fill: #3fb950; } .run { fill: #e3b341; font-weight: bold; }
+  .l { fill: #58a6ff; font-weight: bold; } .h { fill: #d2a8ff; }
+</style>
+<rect class="win" x="0.5" y="0.5" width="939" height="799" rx="10"/>
+<path class="bar" d="M0.5 10.5a10 10 0 0 1 10-10h919a10 10 0 0 1 10 10v30h-939z"/>
+<circle cx="22" cy="20" r="6" fill="#ff5f57"/><circle cx="42" cy="20" r="6" fill="#febc2e"/><circle cx="62" cy="20" r="6" fill="#28c840"/>
+<text class="t" x="470" y="25" text-anchor="middle">agent-log — check on the coding agents you launched</text>
+<text x="28" y="74" xml:space="preserve"><tspan class="p">$ </tspan><tspan class="c">agent-log</tspan></text>
+<text x="28" y="94" xml:space="preserve"><tspan class="d">last(UTC)    kind     id             steps turns  status                   project</tspan></text>
+<text x="28" y="114" xml:space="preserve">10-18 06:26  opencode ses_eb24f4645f     5     1  <tspan class="ok">done</tspan>                     /fx/opencode-real</text>
+<text x="28" y="134" xml:space="preserve">10-18 06:24  opencode ses_eb2512259f     0     1  <tspan class="r">failed</tspan>                   /fx/opencode-real</text>
+<text x="28" y="154" xml:space="preserve">10-18 06:24  gemini   d9840123           4     1  <tspan class="ok">done</tspan>                     /fx/gemini-real</text>
+<text x="28" y="174" xml:space="preserve">10-18 06:23  claude   134298f6           6     1  <tspan class="ok">done</tspan>                     /fx/claude-real</text>
+<text x="28" y="194" xml:space="preserve">10-18 06:23  claude   7ede2b2f           7     1  <tspan class="r">failed</tspan>                   /fx/claude-real</text>
+<text x="28" y="214" xml:space="preserve">10-01 09:01  opencode ses_db1            1     1  <tspan class="r">failed</tspan>                   /fx/opencode-db</text>
+<text x="28" y="234" xml:space="preserve">10-01 09:00  opencode ses_legacy1        2     1  <tspan class="ok">done</tspan>                     /fx/opencode</text>
+<text x="28" y="254" xml:space="preserve">10-01 06:00  pi       66666666           3     2  <tspan class="ok">done</tspan>                     /fx/pi</text>
+<text x="28" y="274" xml:space="preserve">10-01 05:00  gemini   55555555           2     1  <tspan class="ok">done</tspan>                     /fx/gemini</text>
+<text x="28" y="294" xml:space="preserve">10-01 04:00  claude   44444444           3     2  <tspan class="run">running</tspan> proc:cwd         /fx/claude</text>
+<text x="28" y="314" xml:space="preserve">10-01 03:00  codex    22222222           3     1  <tspan class="ok">done</tspan>                     /fx/codex</text>
+<text x="28" y="334" xml:space="preserve">10-01 02:00  droid    11111111           3     1  <tspan class="ok">done</tspan>                     /fx/droid</text>
+<text x="28" y="354" xml:space="preserve"><tspan class="d">status: done | failed (agent/API error) | unknown | running (proc:* = agent process matched, mtime&lt;120s</tspan></text>
+<text x="28" y="374" xml:space="preserve">  <tspan class="d">= just written). Details: agent-log summary &lt;id&gt;</tspan></text>
+<text x="28" y="394" xml:space="preserve"></text>
+<text x="28" y="414" xml:space="preserve"><tspan class="p">$ </tspan><tspan class="c">agent-log summary 134298f6</tspan></text>
+<text x="28" y="434" xml:space="preserve"><tspan class="h">[claude] /fx/claude-real  134298f6  </tspan><tspan class="ok">done</tspan> (ended on assistant text)</text>
+<text x="28" y="454" xml:space="preserve">  steps 6, turns 1, 10-18 06:23 → 10-18 06:23 (UTC), elapsed 0m07s</text>
+<text x="28" y="474" xml:space="preserve"><tspan class="l">TASK:</tspan> Read notes.txt. Fix the bug in calc.py so add returns a+b. Then run: python3 -c 'import calc;</text>
+<text x="28" y="494" xml:space="preserve">  print(calc.add(2,3))'. Then run: cat missing_file.txt (it will fail, that's expected). Reply DONE</text>
+<text x="28" y="514" xml:space="preserve">  briefly.</text>
+<text x="28" y="534" xml:space="preserve"><tspan class="l">FILES CHANGED (1):</tspan> calc.py</text>
+<text x="28" y="554" xml:space="preserve"><tspan class="r">ERRORS (1), last 3:</tspan></text>
+<text x="28" y="574" xml:space="preserve"><tspan class="r">  06:23:50 #5 Bash: Exit code 1 cat: missing_file.txt: No such file or directory</tspan></text>
+<text x="28" y="594" xml:space="preserve"><tspan class="l">LAST ACTIONS:</tspan></text>
+<text x="28" y="614" xml:space="preserve">  06:23:48 #3 SAY Now I'll fix the bug in calc.py:</text>
+<text x="28" y="634" xml:space="preserve">  06:23:48 #3 ▶ Edit /fx/claude-real/calc.py</text>
+<text x="28" y="654" xml:space="preserve">  06:23:50 #4 SAY Now running the commands:</text>
+<text x="28" y="674" xml:space="preserve">  06:23:50 #4 ▶ Bash $ python3 -c 'import calc; print(calc.add(2,3))'</text>
+<text x="28" y="694" xml:space="preserve">  06:23:50 #5 ▶ Bash $ cat missing_file.txt</text>
+<text x="28" y="714" xml:space="preserve">  06:23:52 #6 SAY DONE. Fixed calc.py (a - b → a + b), test returned 5 correctly, and missing_file.txt</text>
+<text x="28" y="734" xml:space="preserve">  failed as expected.</text>
+<text x="28" y="754" xml:space="preserve"><tspan class="l">FINAL (last assistant text):</tspan> DONE. Fixed calc.py (a - b → a + b), test returned 5 correctly, and</text>
+<text x="28" y="774" xml:space="preserve">  missing_file.txt failed as expected.</text>
+</svg>

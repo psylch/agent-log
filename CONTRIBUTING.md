@@ -44,7 +44,12 @@ Everything lives in `agent_log.py`:
      the session.
 2. **Register it** in `PROVIDERS`, add a path marker to `sniff()`, and add a `SCRIPT_HINTS` entry if
    the agent runs as a `node`/`bun` script.
-3. **Document it** in the module docstring (the "Sources" list) and the README's "Supported agents" table.
+3. **Document it** in the module docstring (the "Sources" list) and the "Supported agents" table of
+   `README.md` and `README.zh-CN.md`.
+
+If you change the text output, refresh the README samples (`tests/test_readme.py` compares them with the
+output on the demo home from `examples/demo_home.py`) and regenerate the demo image with
+`python3 docs/assets/make_demo_svg.py`.
 
 ## Fixtures
 

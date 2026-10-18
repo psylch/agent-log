@@ -4,9 +4,16 @@ An agent-friendly progress view of CLI coding-agent sessions. Bots and orchestra
 
 給 bot / orchestrator 用的 CLI coding agent 進度檢視工具。
 
-It is a single Python file (3.10+) that uses only the standard library and reads the agents' own session logs. It never writes to them.
+It is a single Python file (3.9+) that uses only the standard library and reads the agents' own session logs. It never writes to them.
 
 ## Install
+
+```zsh
+pipx install git+https://github.com/psylch/agent-log     # or: uv tool install git+https://github.com/psylch/agent-log
+agent-log                                                # lists recent sessions of every agent
+```
+
+From a checkout, `pip install .` works too. Or copy the single file, since it has no dependencies:
 
 ```zsh
 cp agent_log.py ~/.local/bin/agent-log   # or: ln -s "$PWD/agent_log.py" ~/.local/bin/agent-log

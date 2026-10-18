@@ -28,7 +28,7 @@ EXPECT = [
     ("opencode", "/fx/opencode", "ses_legacy1", 2, 1, ["/fx/opencode/notes.txt"], 1, 0, "done"),
     ("opencode", "/fx/opencode-db", "ses_db1", 1, 1, ["a"], 1, 1, "failed"),
     ("pi", "/fx/pi", "66666666-6666-4666-8666-666666666666", 3, 2, ["/fx/pi/config.json"], 1, 1, "done"),
-    # real sessions recorded on the box through the magpie gateway (paths sanitized to /fx/*-real)
+    # recorded from real agent runs, then sanitized (every path rewritten to /fx/...)
     ("claude", "/fx/claude-real", "134298f6-a5a5-45ef-ad9e-e4b2524e1076", 6, 1, ["/fx/claude-real/calc.py"], 1, 0, "done"),
     ("claude", "/fx/claude-real", "7ede2b2f-bb02-44bf-b388-1f38d9a9f06b", 7, 1, [], 6, 0, "failed"),
     ("gemini", "/fx/gemini-real", "d9840123-71e8-4ec2-bc0e-d95e08e96de0", 4, 1, ["/fx/gemini-real/calc.py"], 1, 0, "done"),
@@ -122,8 +122,9 @@ class AgentLogTest(unittest.TestCase):
         out = self.cli("list", "-n", "50")
         self.assertTrue(out.startswith("last(+08)"))
         rows = [l.split() for l in out.splitlines()[1:]]
-        for prov, cwd, sid, *_ in EXPECT:
-            self.assertIn([prov, al.short_id(sid), cwd], [[r[2], r[3], r[-1]] for r in rows if len(r) > 4])
+        for prov, cwd, sid, *_, status in EXPECT:
+            # the status column uses the same words as list --json
+            self.assertIn([prov, al.short_id(sid), status, cwd], [[r[2], r[3], r[6], r[-1]] for r in rows if len(r) > 4])
 
     def test_list_json(self):
         d = self.cli_json("list", "-n", "50")
@@ -153,7 +154,7 @@ class AgentLogTest(unittest.TestCase):
     # ---- summary ----
     def test_summary_text(self):
         out = self.cli("summary", "--source", "droid")
-        self.assertIn("[droid] /fx/droid  11111111  idle", out)
+        self.assertIn("[droid] /fx/droid  11111111  done (ended on assistant text)", out)
         self.assertIn("TASK: Add a hello function to app.py", out)
         self.assertIn("FILES CHANGED (1): app.py", out)
         self.assertIn("ERRORS (1), last 3:", out)
@@ -163,7 +164,8 @@ class AgentLogTest(unittest.TestCase):
         self.assertIn("FINAL: Fixed the typo in README.md.", out)
         self.assertIn("context compacted 1x", out)
         out = self.cli("summary", "ses_db1")
-        self.assertIn("STATUS: idle, ended without a final text", out)
+        self.assertIn("  failed (ended on agent/API error)", out.splitlines()[0])
+        self.assertIn("STATUS: failed (ended on agent/API error), no final answer", out)
 
     def test_summary_json(self):
         for prov, cwd, sid, *_ in EXPECT:
@@ -237,8 +239,8 @@ class AgentLogTest(unittest.TestCase):
             self.assertEqual(got["gemini:55555555"]["status"], "done")
             self.assertEqual(got["droid:11111111"]["status"], "done")
             out = self.cli("list", "--active")
-            self.assertIn("RUN proc:cwd", out); self.assertNotIn("droid", out)
-            self.assertIn("RUNNING (proc:cwd)", self.cli("summary", "44444444"))
+            self.assertIn("running proc:cwd", out); self.assertNotIn("droid", out)
+            self.assertIn("running (proc:cwd)", self.cli("summary", "44444444"))
         finally:
             shutil.rmtree(self.proc); os.makedirs(self.proc)
             os.utime(pi_path, (st.st_atime, st.st_mtime))

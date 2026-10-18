@@ -480,7 +480,8 @@ class CliTests(Env):
         self.assertEqual(out.strip(), "agent-log 0.1.0")
         self.assertEqual(self.main("--version")[0], 0)
         self.assertEqual(self.main("list")[0], 0)
-        self.assertEqual(self.main()[0], 2)
+        code, out, _ = self.main()
+        self.assertEqual((code, out), self.main("list")[:2])  # bare `agent-log` lists sessions
         self.assertEqual(self.main("--help")[0], 0)
         self.assertEqual(self.main("bogus")[0], 2)
 
@@ -502,9 +503,30 @@ class CliTests(Env):
         _, err = self.cli("summary", "--source", "gemini", code=1, env=env)
         self.assertIn("no sessions found (gemini: " + os.path.join(self.tmp, "nope", "tmp") + " (missing))", err)
         out, err = self.cli("list", "--source", "gemini", env=env)
-        self.assertEqual(out.strip(), "(no sessions)")
+        self.assertEqual(out.splitlines()[:2], ["No agent sessions found. Looked in:",
+                                                "  gemini    " + os.path.join(self.tmp, "nope", "tmp") + "  (not found)"])
+        self.assertIn("AGENT_LOG_HOME_", out)
+        self.assertEqual(err, "")
+        out, err = self.cli("list", "--source", "gemini", "--json", env=env)
+        self.assertEqual(json.loads(out)["sessions"], [])
         self.assertIn("note: not found: gemini:", err)
-        self.assertEqual(json.loads(self.cli("list", "--source", "gemini", "--json", env=env)[0])["sessions"], [])
+
+    def test_first_run_lists_every_agent_dir(self):
+        shutil.rmtree(os.path.join(self.home, ".factory"))
+        out, _ = self.cli()
+        self.assertTrue(out.startswith("No agent sessions found. Looked in:"))
+        for name in al.PROVIDERS: self.assertIn(f"  {name} ", out)
+        self.assertRegex(out, r"\n  droid     ~/\.factory/sessions +\(not found\)\n")
+
+    def test_filters_match_nothing(self):
+        out, _ = self.cli("list", "--active", "--project", "zzz")
+        self.assertEqual(out.strip(), "No sessions match --active --project (2 sessions in total).")
+
+    def test_text_status_matches_json(self):
+        rows = {l.split()[3]: l.split()[6] for l in self.cli("list")[0].splitlines()[1:-1]}
+        for item in json.loads(self.cli("list", "--json")[0])["sessions"]:
+            self.assertEqual(rows[item["session_id"][:8]], item["status"])
+        self.assertIn("  unknown (idle, ended on user)", self.cli("summary", uid(0xaaaa2222)[:8])[0].splitlines()[0])
 
     def test_ambiguous_prefix_warns(self):
         out, err = self.cli("summary", "aaaa", "--json")

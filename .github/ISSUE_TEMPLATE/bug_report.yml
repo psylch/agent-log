@@ -1,0 +1,63 @@
+name: Bug report
+description: agent-log crashed, misread a session, or showed the wrong status.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. Session logs can contain prompts, code and secrets, so please
+        **remove paths, names, emails and tokens** from anything you paste below.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you ran, what you expected, and what you got instead.
+      placeholder: |
+        `agent-log summary --source claude` shows status `unknown`, but the session finished with an answer.
+    validations:
+      required: true
+  - type: textarea
+    id: command
+    attributes:
+      label: Command and output
+      description: The exact command and its output (text or `--json`). It is rendered as code.
+      render: shell
+    validations:
+      required: true
+  - type: dropdown
+    id: agent
+    attributes:
+      label: Which agent's session?
+      multiple: true
+      options: [droid, codex, claude, gemini, opencode, pi, not agent-specific]
+    validations:
+      required: true
+  - type: input
+    id: agent-version
+    attributes:
+      label: Agent version
+      description: For example `claude --version`, `codex --version`, `gemini --version`.
+      placeholder: Claude Code 2.1.197
+  - type: input
+    id: version
+    attributes:
+      label: agent-log version
+      description: Output of `agent-log --version`.
+      placeholder: agent-log 0.1.0
+    validations:
+      required: true
+  - type: input
+    id: env
+    attributes:
+      label: OS and Python version
+      placeholder: macOS 15.1, Python 3.12
+    validations:
+      required: true
+  - type: textarea
+    id: sample
+    attributes:
+      label: Sanitized session sample (optional)
+      description: |
+        A few lines of the session file that trigger the problem make a fix much faster.
+        Replace real paths with `/fx/...` and remove anything private.
+      render: json

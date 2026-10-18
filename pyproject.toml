@@ -1,0 +1,66 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agent-log"
+dynamic = ["version"]
+description = "Check on the coding agents you launched: compact text or stable JSON from droid, Codex CLI, Claude Code, Gemini CLI, opencode and pi session logs."
+readme = "README.md"
+requires-python = ">=3.9"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "psylch" }]
+dependencies = []
+keywords = [
+    "ai-agents", "coding-agent", "claude-code", "codex", "gemini-cli", "opencode", "droid", "factory", "pi",
+    "session-logs", "orchestration", "llm", "cli", "observability", "monitoring", "transcript",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Operating System :: MacOS",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development",
+    "Topic :: System :: Logging",
+    "Topic :: System :: Monitoring",
+    "Topic :: Utilities",
+]
+
+[project.optional-dependencies]
+# reads Codex .jsonl.zst archives without the zstd binary
+zstd = ["zstandard"]
+
+[project.scripts]
+agent-log = "agent_log:main"
+
+[project.urls]
+Homepage = "https://github.com/psylch/agent-log"
+Source = "https://github.com/psylch/agent-log"
+Issues = "https://github.com/psylch/agent-log/issues"
+Changelog = "https://github.com/psylch/agent-log/blob/master/CHANGELOG.md"
+
+[tool.setuptools]
+py-modules = ["agent_log"]
+
+[tool.setuptools.dynamic]
+version = { attr = "agent_log.__version__" }
+
+[tool.ruff]
+target-version = "py39"
+line-length = 160
+extend-exclude = ["ref"]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F"]
+# the module favors dense one-line statements and short loop names
+ignore = ["E401", "E701", "E702", "E731", "E741"]

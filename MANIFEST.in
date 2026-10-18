@@ -1,0 +1,4 @@
+include CHANGELOG.md CONTRIBUTING.md SECURITY.md CODE_OF_CONDUCT.md
+graft tests
+global-exclude __pycache__ *.py[cod]
+prune ref

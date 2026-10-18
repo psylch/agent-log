@@ -1,0 +1,71 @@
+name: Support a new agent
+description: Ask agent-log to read sessions from another coding agent (or a new format of a supported one).
+title: "Support <agent name>"
+labels: [new agent]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        agent-log adds agents based on real session files. The more of the fields below you fill in,
+        the faster support lands. Want to build it yourself? See
+        [CONTRIBUTING.md](https://github.com/psylch/agent-log/blob/master/CONTRIBUTING.md#adding-a-new-agent).
+  - type: input
+    id: name
+    attributes:
+      label: Agent name and link
+      placeholder: Aider, https://github.com/Aider-AI/aider
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Agent version
+      description: The version that wrote the sample below.
+      placeholder: "0.86.1"
+    validations:
+      required: true
+  - type: input
+    id: location
+    attributes:
+      label: Where are session files stored?
+      description: Path pattern and any env var that changes it.
+      placeholder: ~/.aider/sessions/<project>/<id>.jsonl ($AIDER_HOME)
+    validations:
+      required: true
+  - type: dropdown
+    id: format
+    attributes:
+      label: File format
+      options: [JSONL, JSON, SQLite, Markdown / plain text, other]
+    validations:
+      required: true
+  - type: input
+    id: process
+    attributes:
+      label: Process name while it runs
+      description: What `ps` shows, used to tell running sessions from finished ones.
+      placeholder: "aider, or: node /usr/lib/node_modules/some-agent/cli.js"
+  - type: textarea
+    id: sample
+    attributes:
+      label: Sanitized sample session
+      description: |
+        A short session (a prompt, one or two tool calls including a failing one, and a final answer).
+        **Before pasting:** replace every path with `/fx/...`, and remove emails, usernames, hostnames,
+        tokens and API keys. You can also attach the file instead.
+      render: json
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Anything else?
+      description: Subagents, session branching, compaction, resume flags, or other quirks of the format.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: The sample contains no personal data, secrets or private code.
+          required: true
+        - label: I'd be willing to help test or open a pull request.

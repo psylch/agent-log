@@ -1,6 +1,12 @@
 #!/usr/bin/env python3
 """agent-log: read CLI coding-agent sessions as compact text (or JSON) for agents and bots.
 
+Quick start:
+  agent-log                        recent sessions of every agent (same as `agent-log list`)
+  agent-log summary                status, task, files changed, errors and final answer of the newest session
+  agent-log tail -f                follow the newest session as it runs
+  agent-log summary <id> --json    stable JSON for bots and orchestrators (see also list/show --json)
+
 Sources (resolved from $HOME at call time; AGENT_LOG_HOME_<NAME> replaces a provider's base dir):
   droid     ~/.factory/sessions/<escaped-cwd>/<id>.jsonl
   codex     ~/.codex/{sessions,archived_sessions}/**/*.jsonl[.zst]   ($CODEX_HOME)
@@ -1256,8 +1262,8 @@ def window(ev, a):
 
 def header(s, ev):
     steps, turns, t0, t1 = stats(ev)
-    run = f"RUNNING ({s.why})" if s.running else "idle"
-    return (f"[{s.kind}] {s.cwd}  {short_id(s.id)}  {run}\n"
+    st, why = status_of(s, ev)
+    return (f"[{s.kind}] {s.cwd}  {short_id(s.id)}  {st} ({why})\n"
             f"  steps {steps}, turns {turns}, {fmt_t(t0, True)} → {fmt_t(t1, True)} ({tz_label()}), elapsed {fmt_dur((t1 or 0) - (t0 or 0))}")
 
 def rel(path, cwd):
@@ -1277,10 +1283,24 @@ def note_missing(names):
     missing = [f"{n}: {r}" for n in names for r in PROVIDERS[n].roots() if not os.path.isdir(r)]
     if missing: warn("note: not found: " + "; ".join(missing))
 
+def tilde(path):
+    home = os.path.expanduser("~").rstrip("/")
+    return "~" + path[len(home):] if home and (path == home or path.startswith(home + "/")) else path
+
+def print_nothing_found(names):
+    """First-run help: where agent-log looked, and how to point it elsewhere."""
+    print("No agent sessions found. Looked in:")
+    rows = [(n, tilde(r), os.path.isdir(r)) for n in names for r in PROVIDERS[n].roots()]
+    w = max(len(r) for _, r, _ in rows)
+    for n, r, ok in rows:
+        print(f"  {n:<9} {r:<{w}}  (not found)" if not ok else f"  {n:<9} {r}")
+    print("Start a session with one of these agents and run agent-log again, or point it at another\n"
+          "location with AGENT_LOG_HOME_<AGENT>, e.g. AGENT_LOG_HOME_CLAUDE=/data/.claude agent-log")
+
 def cmd_list(a):
     names = source_names(a)
-    ss = discover(names)
-    if a.since is not None: ss = [s for s in ss if s.mtime is not None and s.mtime >= a.since]
+    found = discover(names)
+    ss = found if a.since is None else [s for s in found if s.mtime is not None and s.mtime >= a.since]
     mark_running(ss)
     out = []
     for s in ss:  # newest first: stop reading files once -n rows are found
@@ -1288,17 +1308,21 @@ def cmd_list(a):
         if not s.ok or not in_project(s, a): continue
         out.append(s)
         if a.n and len(out) >= a.n: break
-    if not out and not ss: note_missing(names)
     if a.json:
+        if not found: note_missing(names)
         dump({"schema_version": SCHEMA_VERSION, "sessions": [session_item(s, full=False) for s in out]}); return
-    if not out: print("(no sessions)"); return
+    if not found: print_nothing_found(names); return
+    if not out:
+        flags = [f for f, on in (("--active", a.active), ("--project", a.project), ("--since", a.since is not None)) if on]
+        print(f"No sessions match {' '.join(flags) or 'the filters'} ({len(found)} sessions in total)."); return
     idw = max([8] + [len(short_id(s.id)) for s in out])
-    print(f"{'last(' + tz_label() + ')':<12} {'kind':<8} {'id':<{idw}} {'steps':>5} {'turns':>5}  {'status':<20} project")
+    print(f"{'last(' + tz_label() + ')':<12} {'kind':<8} {'id':<{idw}} {'steps':>5} {'turns':>5}  {'status':<24} project")
     for s in out:
         b = s.brief()
-        st = f"RUN {s.why}" if s.running else "-"
-        print(f"{fmt_t(s.mtime, True):<12} {s.kind:<8} {short_id(s.id):<{idw}} {b['steps']:>5} {b['turns']:>5}  {st:<20} {s.cwd}")
-    print(dim(f"status: proc:cwd/proc:session-id = live agent process matched (newest session in that cwd); mtime<{RECENT_S}s = file just written"))
+        st = f"running {s.why}" if s.running else b["status"]
+        print(f"{fmt_t(s.mtime, True):<12} {s.kind:<8} {short_id(s.id):<{idw}} {b['steps']:>5} {b['turns']:>5}  {st:<24} {s.cwd}")
+    print(dim(f"status: done | failed (agent/API error) | unknown | running (proc:* = agent process matched, "
+              f"mtime<{RECENT_S}s = just written). Details: agent-log summary <id>"))
 
 def get_session(a):
     names = source_names(a)
@@ -1360,8 +1384,12 @@ def cmd_summary(a):
         print(f"  {fmt_t(e['t'])} #{e['n']} " + (f"▶ {e['text']}" if e["k"] == "tool_call" else f"SAY {short(e['text'], 200)}"))
     fa, explicit = final_answer(s, ev)
     if fa is not None: print(f"{'FINAL' if explicit else 'FINAL (last assistant text)'}: {short(fa, 1200)}")
-    elif s.running: print("STATUS: still running — no final answer yet")
-    else: print("STATUS: idle, ended without a final text (crashed/killed or ended on a tool call?)")
+    else:
+        st, why = status_of(s, ev)
+        if st == "running": print(f"STATUS: running ({why}), no final answer yet")
+        elif st == "failed": print(f"STATUS: failed ({why}), no final answer")
+        elif st == "done": print(f"STATUS: done ({why}), the final message is empty")
+        else: print(f"STATUS: {st} ({why}), no final answer (crashed/killed or ended on a tool call?)")
 
 # ---------------- CLI ----------------
 def int_arg(lo):
@@ -1432,6 +1460,8 @@ def main(argv=None):
     for stream in (sys.stdout, sys.stderr):
         try: stream.reconfigure(errors="replace")  # never die on a non-UTF-8 terminal
         except Exception: pass
+    argv = sys.argv[1:] if argv is None else list(argv)
+    if not argv: argv = ["list"]  # bare `agent-log` is the first thing a new user types: show something useful
     try: a = build_parser().parse_args(argv)
     except SystemExit as x:
         return x.code if isinstance(x.code, int) else (0 if x.code is None else 2)

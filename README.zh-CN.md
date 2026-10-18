@@ -5,7 +5,7 @@
 <h1 align="center">agent-log</h1>
 
 <p align="center">
-  <b>给编程 agent 用的 <code>tail -f</code>，专为“启动它们的那个 agent”而做。</b><br>
+  <b>给编程 agent 用的 <code>tail -f</code>，专为把活交给它们的常驻个人 agent 而做。</b><br>
   在脚本里查看 Claude Code、Codex CLI、Gemini CLI、opencode、droid 和 pi 的会话：<br>
   一屏文字或一个 JSON 对象，包含状态、改动的文件、错误和最终回答。
 </p>
@@ -24,9 +24,26 @@
   <img src="docs/assets/demo.svg" alt="agent-log 列出六种编程 agent 的会话，然后用一屏总结一个 Claude Code 会话" width="860">
 </p>
 
+## 给谁用
+
+**主要用户：有自己运行环境、一直在线的个人 agent。**
+比如 Grok Bot，以及其他跑在一台常驻机器或 shell 上的个人 agent。
+这类 agent 经常把写代码之类的长任务交给装在同一台机器上的命令行编程 agent
+（droid、Codex CLI、Claude Code、Gemini CLI、opencode 或 pi），让它在后台跑，自己先去忙别的。
+之后它需要回答三个问题，又不可能一直盯着终端：还在跑吗？改了什么？有没有出错？
+agent-log 用一屏文字或一个 JSON 对象给出答案。
+
+一个典型场景：你让个人 agent 修好仓库里一个挂掉的测试。
+它在自己的机器上后台启动 `droid exec "fix the failing test"`，然后先回复你。
+二十分钟后你问“怎么样了？”，它运行 `agent-log summary latest --json`，
+告诉你：已完成，改了 3 个文件，没有报错，再附上 droid 的最终回答。
+整个过程它不用翻几 MB 的原始会话日志，也不用开着终端盯着。
+
+**其次也适合人自己用**：你在后台同时跑了几个命令行编程 agent，想快速看一眼每个的情况，不用来回切终端。
+
 ## 为什么需要它
 
-你（或者你的 bot、你的主 agent）在后台启动了几个编程 agent：`claude -p`、`codex exec`、`droid exec`。
+你（或者你的个人 agent）在后台启动了几个编程 agent：`claude -p`、`codex exec`、`droid exec`。
 接下来要回答三个问题：跑完了吗？改了什么？有没有出错？
 
 每个 agent 都会写会话日志，但这些日志很难直接用：

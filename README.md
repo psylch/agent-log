@@ -5,7 +5,7 @@
 <h1 align="center">agent-log</h1>
 
 <p align="center">
-  <b><code>tail -f</code> for your coding agents, built for the agents that launched them.</b><br>
+  <b><code>tail -f</code> for your coding agents, made for always-on personal agents that hand work to them.</b><br>
   Check on Claude Code, Codex CLI, Gemini CLI, opencode, droid and pi from a script:<br>
   one screen of text or one JSON object with the status, files changed, errors and final answer.
 </p>
@@ -24,9 +24,28 @@
   <img src="docs/assets/demo.svg" alt="agent-log listing sessions from six coding agents, then a one-screen summary of a Claude Code session" width="860">
 </p>
 
+## Who it's for
+
+**Main user: always-on personal agents that have their own machine.**
+Grok Bot is one example; other personal agents that live on a persistent machine or shell work the same way.
+These agents often hand coding work and other long tasks to a CLI coding agent installed on that same machine
+(droid, Codex CLI, Claude Code, Gemini CLI, opencode or pi), run it in the background, and move on.
+Later they need to answer three questions without sitting in front of a terminal:
+is the run still going, what did it change, and did it hit errors?
+agent-log gives them that answer as one screen of text or one JSON object.
+
+A typical case: you ask your personal agent to fix a failing test in your repo.
+It starts `droid exec "fix the failing test"` in the background on its machine and replies to you.
+Twenty minutes later you ask "how's it going?". The agent runs `agent-log summary latest --json`
+and tells you: done, 3 files changed, no errors, plus droid's final answer.
+It never has to read megabytes of raw session logs or keep a terminal open.
+
+**Also useful for people** who run several CLI coding agents in the background themselves
+and want a quick look at each one without switching between terminals.
+
 ## Why
 
-You (or your bot, or your main agent) started a few coding agents in the background: `claude -p`, `codex exec`, `droid exec`.
+You (or your personal agent) started a few coding agents in the background: `claude -p`, `codex exec`, `droid exec`.
 Now you need to know three things. Are they done? What did they change? Did anything go wrong?
 
 Every agent writes a session log, but the logs are hard to use:
@@ -42,7 +61,7 @@ It is a single Python file with no dependencies. It only reads the logs, never w
 
 ## Contents
 
-[Install](#install) · [Quickstart](#quickstart) · [Supported agents](#supported-agents) · [Commands](#commands) ·
+[Who it's for](#who-its-for) · [Install](#install) · [Quickstart](#quickstart) · [Supported agents](#supported-agents) · [Commands](#commands) ·
 [JSON output](#json-output) · [Use with orchestrators](#use-with-orchestrators) · [Why not X?](#why-not-x) ·
 [FAQ and limitations](#faq-and-limitations) · [Contributing](#contributing)
 

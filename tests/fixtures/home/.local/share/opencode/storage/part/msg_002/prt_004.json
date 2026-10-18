@@ -1,0 +1,19 @@
+{
+ "id": "prt_004",
+ "messageID": "msg_002",
+ "type": "tool",
+ "tool": "write",
+ "callID": "call_1",
+ "state": {
+  "status": "completed",
+  "input": {
+   "filePath": "/fx/opencode/notes.txt",
+   "content": "hi"
+  },
+  "output": "Wrote file",
+  "time": {
+   "start": 1790845205500,
+   "end": 1790845206000
+  }
+ }
+}

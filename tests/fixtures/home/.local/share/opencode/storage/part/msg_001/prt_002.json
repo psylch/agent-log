@@ -1,0 +1,7 @@
+{
+ "id": "prt_002",
+ "messageID": "msg_001",
+ "type": "text",
+ "text": "synthetic context",
+ "synthetic": true
+}

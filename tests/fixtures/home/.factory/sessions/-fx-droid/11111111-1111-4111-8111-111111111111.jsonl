@@ -1,0 +1,8 @@
+{"type": "session_start", "id": "11111111-1111-4111-8111-111111111111", "title": "t", "cwd": "/fx/droid"}
+{"type": "message", "id": "m1", "timestamp": "2026-10-01T02:00:00.000Z", "message": {"role": "user", "content": [{"type": "text", "text": "<system-reminder>ignore me</system-reminder>"}, {"type": "text", "text": "Add a hello function to app.py"}]}}
+{"type": "message", "id": "m2", "timestamp": "2026-10-01T02:00:05.000Z", "message": {"role": "assistant", "content": [{"type": "thinking", "thinking": "plan the edit"}, {"type": "text", "text": "I'll edit app.py."}, {"type": "tool_use", "id": "t1", "name": "Edit", "input": {"file_path": "/fx/droid/app.py", "old_str": "a", "new_str": "b"}}]}}
+{"type": "message", "id": "m3", "timestamp": "2026-10-01T02:00:06.000Z", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "t1", "content": "ok"}]}}
+{"type": "message", "id": "m4", "timestamp": "2026-10-01T02:00:07.000Z", "message": {"role": "assistant", "content": [{"type": "tool_use", "id": "t2", "name": "Execute", "input": {"command": "python3 -m pytest"}}]}}
+{"type": "message", "id": "m5", "timestamp": "2026-10-01T02:00:09.000Z", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "t2", "is_error": true, "content": "1 failed"}]}}
+{"type": "compaction_state", "timestamp": "2026-10-01T02:00:10.000Z", "summaryText": "earlier work summarized"}
+{"type": "message", "id": "m6", "timestamp": "2026-10-01T02:00:12.000Z", "message": {"role": "assistant", "content": [{"type": "text", "text": "Added hello(); one test still fails."}]}}

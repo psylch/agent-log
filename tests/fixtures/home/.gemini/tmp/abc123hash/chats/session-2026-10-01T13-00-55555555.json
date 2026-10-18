@@ -1,0 +1,88 @@
+{
+ "sessionId": "55555555-5555-4555-8555-555555555555",
+ "projectHash": "abc123hash",
+ "startTime": "2026-10-01T05:00:00.000Z",
+ "lastUpdated": "2026-10-01T05:00:06.000Z",
+ "messages": [
+  {
+   "id": "g1",
+   "timestamp": "2026-10-01T05:00:01.000Z",
+   "type": "user",
+   "content": "Rename foo to bar"
+  },
+  {
+   "id": "g2",
+   "timestamp": "2026-10-01T05:00:02.000Z",
+   "type": "gemini",
+   "content": "Renaming now.",
+   "model": "gemini-x",
+   "thoughts": [
+    {
+     "subject": "Plan",
+     "description": "use replace",
+     "timestamp": "2026-10-01T05:00:02.000Z"
+    }
+   ],
+   "toolCalls": [
+    {
+     "id": "tc1",
+     "name": "replace",
+     "args": {
+      "file_path": "/fx/gemini/lib.py",
+      "old_string": "foo",
+      "new_string": "bar"
+     },
+     "status": "success",
+     "timestamp": "2026-10-01T05:00:03.000Z",
+     "result": [
+      {
+       "functionResponse": {
+        "id": "tc1",
+        "name": "replace",
+        "response": {
+         "output": "Replaced 1 occurrence"
+        }
+       }
+      }
+     ]
+    },
+    {
+     "id": "tc2",
+     "name": "run_shell_command",
+     "args": {
+      "command": "pytest"
+     },
+     "status": "error",
+     "timestamp": "2026-10-01T05:00:04.000Z",
+     "result": [
+      {
+       "functionResponse": {
+        "id": "tc2",
+        "name": "run_shell_command",
+        "response": {
+         "error": "exit status 1"
+        }
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "g3",
+   "timestamp": "2026-10-01T05:00:05.000Z",
+   "type": "info",
+   "content": "info messages are ignored"
+  },
+  {
+   "id": "g4",
+   "timestamp": "2026-10-01T05:00:06.000Z",
+   "type": "gemini",
+   "content": [
+    {
+     "text": "Renamed; tests fail."
+    }
+   ]
+  }
+ ]
+}

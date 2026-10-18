@@ -1,0 +1,11 @@
+{"type": "session", "version": 3, "id": "66666666-6666-4666-8666-666666666666", "timestamp": "2026-10-01T06:00:00.000Z", "cwd": "/fx/pi"}
+{"type": "model_change", "id": "mc1", "parentId": null, "timestamp": "2026-10-01T06:00:00.000Z", "provider": "x", "modelId": "m"}
+{"type": "message", "id": "u1", "parentId": "mc1", "timestamp": "2026-10-01T06:00:01.000Z", "message": {"role": "user", "content": "Update config.json"}}
+{"type": "message", "id": "a1", "parentId": "u1", "timestamp": "2026-10-01T06:00:02.000Z", "message": {"role": "assistant", "content": [{"type": "thinking", "thinking": "edit it"}, {"type": "text", "text": "Editing."}, {"type": "toolCall", "id": "tc1", "name": "edit", "arguments": {"path": "/fx/pi/config.json", "edits": [{"oldText": "1", "newText": "2"}]}}], "stopReason": "toolUse"}}
+{"type": "message", "id": "r1", "parentId": "a1", "timestamp": "2026-10-01T06:00:03.000Z", "message": {"role": "toolResult", "toolCallId": "tc1", "toolName": "edit", "content": [{"type": "text", "text": "Edited"}], "isError": false}}
+{"type": "message", "id": "a2", "parentId": "r1", "timestamp": "2026-10-01T06:00:04.000Z", "message": {"role": "assistant", "content": [{"type": "text", "text": "abandoned branch answer"}], "stopReason": "stop"}}
+{"type": "message", "id": "u2", "parentId": "r1", "timestamp": "2026-10-01T06:00:05.000Z", "message": {"role": "user", "content": [{"type": "text", "text": "Actually also run tests"}]}}
+{"type": "message", "id": "a3", "parentId": "u2", "timestamp": "2026-10-01T06:00:06.000Z", "message": {"role": "assistant", "content": [{"type": "toolCall", "id": "tc2", "name": "bash", "arguments": {"command": "npm test"}}], "stopReason": "toolUse"}}
+{"type": "message", "id": "r2", "parentId": "a3", "timestamp": "2026-10-01T06:00:07.000Z", "message": {"role": "toolResult", "toolCallId": "tc2", "toolName": "bash", "content": [{"type": "text", "text": "1 failing"}], "isError": true}}
+{"type": "compaction", "id": "cp1", "parentId": "r2", "timestamp": "2026-10-01T06:00:08.000Z", "summary": "compacted pi history", "firstKeptEntryId": "r2"}
+{"type": "message", "id": "a4", "parentId": "cp1", "timestamp": "2026-10-01T06:00:09.000Z", "message": {"role": "assistant", "content": [{"type": "text", "text": "Config updated; tests fail."}], "stopReason": "stop"}}

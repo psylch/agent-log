@@ -1,0 +1,10 @@
+CREATE TABLE session_v2 (id TEXT PRIMARY KEY, parent_id TEXT, directory TEXT NOT NULL, title TEXT, version TEXT, time_created INTEGER NOT NULL, time_updated INTEGER NOT NULL);
+CREATE TABLE session_message (id TEXT PRIMARY KEY, session_id TEXT NOT NULL, type TEXT NOT NULL, seq INTEGER NOT NULL, time_created INTEGER NOT NULL, time_updated INTEGER NOT NULL, data TEXT NOT NULL);
+INSERT INTO session_v2 VALUES ('ses_db1', NULL, '/fx/opencode-db', 'list', '2.0.14', 1790845300000, 1790845310000);
+INSERT INTO session_v2 VALUES ('ses_dbchild', 'ses_db1', '/fx/opencode-db', 'sub', '2.0.14', 1790845301000, 1790845302000);
+INSERT INTO session_message VALUES ('msg_a','ses_db1','user',1,1790845300000,1790845300000,'{"text": "List files and fix a", "files": [], "time": {"created": 1790845300000}}');
+INSERT INTO session_message VALUES ('msg_b','ses_db1','assistant',3,1790845301000,1790845301000,'{"agent": "build", "time": {"created": 1790845301000}, "content": [{"type": "reasoning", "text": ""}, {"type": "text", "text": "Listing."}, {"type": "tool", "id": "c1", "name": "shell", "state": {"status": "completed", "input": {"command": "ls"}, "content": [{"type": "text", "text": "a\nb"}], "metadata": {"exit": 0}}, "time": {"completed": 1790845302000}}, {"type": "tool", "id": "c2", "name": "edit", "state": {"status": "completed", "input": {"path": "a", "oldString": "x", "newString": "y"}, "content": [{"type": "text", "text": "Edited a"}]}, "time": {"completed": 1790845303000}}]}');
+INSERT INTO session_message VALUES ('msg_c','ses_db1','compaction',5,1790845304000,1790845304000,'{"status": "completed", "reason": "auto", "summary": "compacted history", "time": {"created": 1790845304000}}');
+INSERT INTO session_message VALUES ('msg_d','ses_db1','assistant',7,1790845305000,1790845305000,'{"agent": "build", "content": [], "finish": "error", "error": {"message": "invalid model"}, "time": {"created": 1790845305000}}');
+INSERT INTO session_message VALUES ('msg_e','ses_db1','idle',8,1790845306000,1790845306000,'{"outcome": "failed"}');
+INSERT INTO session_message VALUES ('msg_f','ses_dbchild','user',1,1790845301000,1790845301000,'{"text": "child prompt"}');

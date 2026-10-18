@@ -1,0 +1,12 @@
+{
+ "id": "ses_child1",
+ "projectID": "proj1",
+ "parentID": "ses_legacy1",
+ "directory": "/fx/opencode",
+ "title": "sub",
+ "version": "0.15.0",
+ "time": {
+  "created": 1790845203000,
+  "updated": 1790845204000
+ }
+}

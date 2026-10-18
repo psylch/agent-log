@@ -45,9 +45,17 @@
 需要 Python 3.9 或更新版本，支持 Linux 和 macOS。任选一种：
 
 ```sh
+pipx install agent-log-cli
+uv tool install agent-log-cli
+uvx agent-log-cli                              # 不安装，直接跑一次
+```
+
+从 git 安装（装完命令仍是 `agent-log`）：
+
+```sh
 pipx install git+https://github.com/psylch/agent-log
 uv tool install git+https://github.com/psylch/agent-log
-uvx --from git+https://github.com/psylch/agent-log agent-log      # 不安装，直接跑一次
+uvx --from git+https://github.com/psylch/agent-log agent-log
 ```
 
 或者直接复制这个单文件，它没有任何依赖：
@@ -59,8 +67,8 @@ chmod +x ~/.local/bin/agent-log
 ```
 
 > [!NOTE]
-> agent-log 还没有发布到 PyPI。PyPI 上的 `agent-log` 是另一个无关的项目，
-> 所以 `pip install agent-log` 会装错。请用上面的命令安装。
+> 命令名是 `agent-log`。PyPI 包名是 `agent-log-cli`，因为 PyPI 上的 `agent-log` 是另一个无关项目——
+> `pip install agent-log` 会装错。
 
 如果要读取 Codex 归档的 `.jsonl.zst` 会话，需要装 `zstd` 命令或 `zstandard` Python 包，否则这些归档会被跳过。
 

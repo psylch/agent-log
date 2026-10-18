@@ -7,6 +7,11 @@ The JSON output has its own `schema_version`, which only changes on breaking cha
 
 ## [Unreleased]
 
+### Changed
+
+- PyPI package name is `agent-log-cli` (the CLI command remains `agent-log`). The `agent-log`
+  name on PyPI belongs to an unrelated project.
+
 ### Added
 
 - README rewrite with a demo, install options, a JSON schema reference, orchestrator recipes, a comparison
@@ -38,7 +43,7 @@ First public release.
 - A per-file cache for `list` in `$XDG_CACHE_HOME/agent-log`, keyed by size and mtime
   (`--no-cache` or `AGENT_LOG_NO_CACHE=1` to disable).
 - Exit codes: 0 ok, 1 nothing found, 2 usage error. User errors print a message, not a traceback.
-- Packaging: `pyproject.toml` with an `agent-log` console script, installable with `pipx`, `uv tool` or `pip`.
+- Packaging: `pyproject.toml` (`agent-log-cli` on PyPI) with an `agent-log` console script, installable with `pipx`, `uv tool` or `pip`.
   No runtime dependencies; the optional `zstd` extra reads Codex `.jsonl.zst` archives without the `zstd` binary.
 - CI on Linux and macOS for Python 3.9 to 3.13, plus a build-and-install smoke test and a ruff lint.
 - Contributor docs, issue templates (including one for requesting a new agent) and a security policy.

@@ -51,9 +51,17 @@ It is a single Python file with no dependencies. It only reads the logs, never w
 Python 3.9 or newer, on Linux or macOS. Pick one:
 
 ```sh
+pipx install agent-log-cli
+uv tool install agent-log-cli
+uvx agent-log-cli                              # run once without installing
+```
+
+From git (same command name after install):
+
+```sh
 pipx install git+https://github.com/psylch/agent-log
 uv tool install git+https://github.com/psylch/agent-log
-uvx --from git+https://github.com/psylch/agent-log agent-log      # run once without installing
+uvx --from git+https://github.com/psylch/agent-log agent-log
 ```
 
 Or copy the single file. It has no dependencies:
@@ -65,8 +73,8 @@ chmod +x ~/.local/bin/agent-log
 ```
 
 > [!NOTE]
-> agent-log is not on PyPI yet. The `agent-log` name on PyPI belongs to an unrelated project,
-> so `pip install agent-log` installs the wrong thing. Use one of the commands above.
+> The CLI command is `agent-log`. The PyPI package is named `agent-log-cli` because
+> `agent-log` on PyPI belongs to an unrelated project — `pip install agent-log` installs the wrong thing.
 
 To read archived Codex sessions (`.jsonl.zst`), install either the `zstd` command or the `zstandard` Python package. Without one of them, those archives are skipped.
 
